@@ -168,8 +168,17 @@ def jobman(state, channel):
     assert isinstance(scan_node.op, theano.scan_module.scan_op.Scan)
     n_pos = scan_node.op.n_seqs + 1
     init_h = scan_node.inputs[n_pos]
-    y = TT.nnet.softmax(TT.dot(h[-1], W_hy) + b_hy)
-    cost = -(t * TT.log(y)).mean(axis=0).sum()
+
+    if task.classifType == 'lastSoftmax':
+        y = TT.nnet.softmax(TT.dot(h[-1], W_hy) + b_hy)
+        cost = -(t * TT.log(y)).mean(axis=0).sum()
+    elif task.classifType == 'softmax':
+        nwh = h.reshape((h.shape[0]*h.shape[1], h.shape[2]))
+        y = TT.nnet.softmax(TT.dot(nwh, W_hy) + b_hy)
+        cost = -(t * TT.log(y)).mean(axis=0).sum()
+    elif task.classifType == 'lastLinear':
+        y = TT.dot(h[-1], W_hy) + b_hy
+        cost = ((t - y)**2).mean(axis=0).sum()
 
     # Compute gradients
     gW_hh, gW_uh, gW_hy,\
@@ -447,7 +456,7 @@ if __name__=='__main__':
     #   * mul     - multiplication task
     #   * mem     - memorization task
     #   * perm    - random permutation task
-    state['task'] = 'torder3'
+    state['task'] = 'mem'
     # Pick network initialization style. It has to be one of the 3 variants
     # described in the paper, i.e.:
     #   * sigmoid
@@ -474,7 +483,7 @@ if __name__=='__main__':
     # your machine
     state['cbs'] = 1000
     # How often do we compute test error
-    state['checkFreq'] = 2000
+    state['checkFreq'] = 20
     # Constant used for numerical stability. When computing the
     # regularizationt term, values for which dC/dx_k is smaller than `bound`
     # are not considered
@@ -491,4 +500,8 @@ if __name__=='__main__':
     # Prefix to be appended to name of the file in which the state of the
     # experiemt is stored.
     state['name'] = 'test'
+
+    state['memvalues'] = 5
+    state['mempos'] = 10
+    state['memall'] = False
     jobman(state, None)
